@@ -66,8 +66,13 @@ class DatabaseInitializer:
     
     def _create_example_budgets(self, categories: list) -> None:
         """Создает примеры бюджетов"""
-        from ..core.models.budget import Budget, BudgetPeriod
+        from ...core.models.budget import Budget, BudgetPeriod
         from datetime import date
+        
+        # Проверяем, есть ли уже бюджеты
+        existing_budgets = self.budget_service.get_budgets()
+        if existing_budgets:
+            return
         
         # Находим категории для создания бюджетов
         food_category = next((cat for cat in categories if cat.name == "Продукты"), None)

@@ -327,6 +327,11 @@ class CategoryService:
         Returns:
             Список созданных категорий
         """
+        # Проверяем, есть ли уже категории
+        existing_categories = self.get_categories()
+        if existing_categories:
+            return existing_categories
+        
         default_categories = [
             # Доходы
             Category(name="Зарплата", category_type=CategoryType.INCOME, 

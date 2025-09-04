@@ -21,7 +21,7 @@ pyyaml = "^6.0"
 python-dotenv = "^1.0.0"
 click = "^8.1.0"
 rich = "^13.0.0"
-tkinter = "*"
+# tkinter is built-in with Python, no need to specify
 pillow = "^10.0.0"
 
 [tool.poetry.group.dev.dependencies]

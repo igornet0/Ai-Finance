@@ -321,7 +321,7 @@ class CategoryDialog:
         
         # Активна
         self.active_var = tk.BooleanVar()
-        self.active_check = ttk.Checkbutton(main_frame, text="Активна", variable=self.active_var)
+        self.active_check = tk.Checkbutton(main_frame, text="Активна", variable=self.active_var)
         self.active_check.grid(row=6, column=0, columnspan=2, sticky=tk.W, pady=5)
         
         # Кнопки
@@ -519,7 +519,7 @@ class BudgetDialog:
         
         # Активен
         self.active_var = tk.BooleanVar()
-        self.active_check = ttk.Checkbutton(main_frame, text="Активен", variable=self.active_var)
+        self.active_check = tk.Checkbutton(main_frame, text="Активен", variable=self.active_var)
         self.active_check.grid(row=7, column=0, columnspan=2, sticky=tk.W, pady=5)
         
         # Кнопки
