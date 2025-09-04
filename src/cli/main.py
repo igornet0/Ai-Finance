@@ -3,6 +3,7 @@
 """
 
 import click
+import os
 from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
@@ -17,6 +18,7 @@ from ..core.models.transaction import Transaction, TransactionType
 from ..core.models.category import Category, CategoryType
 from ..core.models.budget import Budget, BudgetPeriod
 from ..core.calculators import BalanceCalculator, StatisticsCalculator
+from ..analytics import ChartGenerator, ReportGenerator
 
 console = Console()
 
@@ -373,6 +375,179 @@ def transactions(limit):
         
     except Exception as e:
         console.print(f"❌ Ошибка при получении транзакций: {e}")
+
+
+@main.command()
+@click.option('--start-date', type=str, help='Начальная дата (YYYY-MM-DD)')
+@click.option('--end-date', type=str, help='Конечная дата (YYYY-MM-DD)')
+@click.option('--output-dir', type=str, default='reports', help='Директория для сохранения отчетов')
+def generate_report(start_date, end_date, output_dir):
+    """Генерировать комплексный финансовый отчет с графиками"""
+    services = get_services()
+    transaction_service = services['transaction_service']
+    category_service = services['category_service']
+    budget_service = services['budget_service']
+    
+    try:
+        # Определяем период
+        if start_date and end_date:
+            start = datetime.fromisoformat(start_date).date()
+            end = datetime.fromisoformat(end_date).date()
+        else:
+            # По умолчанию - текущий месяц
+            today = date.today()
+            start = today.replace(day=1)
+            if today.month == 12:
+                end = today.replace(year=today.year + 1, month=1, day=1) - timedelta(days=1)
+            else:
+                end = today.replace(month=today.month + 1, day=1) - timedelta(days=1)
+        
+        console.print(f"📊 Генерация отчета за период: {start.strftime('%d.%m.%Y')} - {end.strftime('%d.%m.%Y')}")
+        
+        # Получаем данные
+        transactions = transaction_service.get_transactions(start_date=start, end_date=end)
+        categories = category_service.get_categories()
+        budget_statuses = budget_service.get_all_budgets_status()
+        
+        if not transactions:
+            console.print("❌ Нет транзакций за указанный период")
+            return
+        
+        # Создаем генератор отчетов
+        report_generator = ReportGenerator(output_dir)
+        
+        # Генерируем комплексный отчет
+        files = report_generator.generate_comprehensive_report(
+            transactions, categories, budget_statuses, start, end
+        )
+        
+        console.print("✅ Отчет успешно создан!")
+        console.print(f"📁 Директория: {output_dir}")
+        
+        # Показываем созданные файлы
+        table = Table(title="📋 Созданные файлы", box=box.ROUNDED)
+        table.add_column("Тип", style="cyan")
+        table.add_column("Файл", style="green")
+        
+        for file_type, file_path in files.items():
+            filename = os.path.basename(file_path)
+            table.add_row(file_type, filename)
+        
+        console.print(table)
+        
+    except Exception as e:
+        console.print(f"❌ Ошибка при создании отчета: {e}")
+
+
+@main.command()
+@click.option('--year', type=int, help='Год для отчета')
+@click.option('--month', type=int, help='Месяц для отчета (1-12)')
+@click.option('--output-dir', type=str, default='reports', help='Директория для сохранения отчетов')
+def monthly_report(year, month, output_dir):
+    """Генерировать месячный отчет"""
+    services = get_services()
+    transaction_service = services['transaction_service']
+    category_service = services['category_service']
+    
+    try:
+        # Определяем год и месяц
+        if not year or not month:
+            today = date.today()
+            year = year or today.year
+            month = month or today.month
+        
+        console.print(f"📊 Генерация месячного отчета: {month:02d}.{year}")
+        
+        # Получаем данные
+        transactions = transaction_service.get_transactions()
+        categories = category_service.get_categories()
+        
+        if not transactions:
+            console.print("❌ Нет транзакций")
+            return
+        
+        # Создаем генератор отчетов
+        report_generator = ReportGenerator(output_dir)
+        
+        # Генерируем месячный отчет
+        files = report_generator.generate_monthly_report(
+            transactions, categories, year, month
+        )
+        
+        console.print("✅ Месячный отчет успешно создан!")
+        console.print(f"📁 Директория: {output_dir}")
+        
+        # Показываем созданные файлы
+        table = Table(title="📋 Созданные файлы", box=box.ROUNDED)
+        table.add_column("Тип", style="cyan")
+        table.add_column("Файл", style="green")
+        
+        for file_type, file_path in files.items():
+            filename = os.path.basename(file_path)
+            table.add_row(file_type, filename)
+        
+        console.print(table)
+        
+    except Exception as e:
+        console.print(f"❌ Ошибка при создании месячного отчета: {e}")
+
+
+@main.command()
+@click.option('--chart-type', type=click.Choice(['balance', 'income-expense', 'category-pie', 'trends', 'budget']), 
+              required=True, help='Тип графика')
+@click.option('--start-date', type=str, help='Начальная дата (YYYY-MM-DD)')
+@click.option('--end-date', type=str, help='Конечная дата (YYYY-MM-DD)')
+@click.option('--output-dir', type=str, default='charts', help='Директория для сохранения графиков')
+def generate_chart(chart_type, start_date, end_date, output_dir):
+    """Генерировать график"""
+    services = get_services()
+    transaction_service = services['transaction_service']
+    budget_service = services['budget_service']
+    
+    try:
+        # Определяем период
+        if start_date and end_date:
+            start = datetime.fromisoformat(start_date).date()
+            end = datetime.fromisoformat(end_date).date()
+        else:
+            # По умолчанию - последние 30 дней
+            end = date.today()
+            start = end - timedelta(days=30)
+        
+        console.print(f"📈 Генерация графика: {chart_type}")
+        console.print(f"📅 Период: {start.strftime('%d.%m.%Y')} - {end.strftime('%d.%m.%Y')}")
+        
+        # Получаем данные
+        transactions = transaction_service.get_transactions(start_date=start, end_date=end)
+        
+        if not transactions:
+            console.print("❌ Нет транзакций за указанный период")
+            return
+        
+        # Создаем генератор графиков
+        chart_generator = ChartGenerator(output_dir)
+        
+        # Генерируем график в зависимости от типа
+        if chart_type == 'balance':
+            file_path = chart_generator.generate_balance_chart(transactions, start, end)
+        elif chart_type == 'income-expense':
+            file_path = chart_generator.generate_income_expense_chart(transactions, start, end)
+        elif chart_type == 'category-pie':
+            file_path = chart_generator.generate_category_pie_chart(transactions, start, end)
+        elif chart_type == 'trends':
+            file_path = chart_generator.generate_trend_analysis_chart(transactions)
+        elif chart_type == 'budget':
+            budget_statuses = budget_service.get_all_budgets_status()
+            if not budget_statuses:
+                console.print("❌ Нет активных бюджетов")
+                return
+            file_path = chart_generator.generate_budget_status_chart(budget_statuses)
+        
+        console.print(f"✅ График успешно создан: {os.path.basename(file_path)}")
+        console.print(f"📁 Путь: {file_path}")
+        
+    except Exception as e:
+        console.print(f"❌ Ошибка при создании графика: {e}")
 
 
 @main.command()
