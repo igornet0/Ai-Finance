@@ -146,3 +146,19 @@ def get_database_url() -> str:
         return f"postgresql://{DATABASE_CONFIG['user']}:{DATABASE_CONFIG['password']}@{DATABASE_CONFIG['host']}:{DATABASE_CONFIG['port']}/{DATABASE_CONFIG['database']}"
     else:
         raise ValueError(f"Неподдерживаемый тип базы данных: {DATABASE_CONFIG['type']}")
+
+
+class Settings:
+    """Класс настроек приложения"""
+    
+    def __init__(self):
+        self.database_path = DATABASE_CONFIG["path"]
+        self.debug = APP_CONFIG["debug"]
+        self.language = APP_CONFIG["language"]
+        self.currency = APP_CONFIG["currency"]
+        self.timezone = APP_CONFIG["timezone"]
+
+
+def get_settings() -> Settings:
+    """Получить объект настроек"""
+    return Settings()
