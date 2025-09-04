@@ -19,6 +19,7 @@ from ..core.models.category import Category, CategoryType
 from ..core.models.budget import Budget, BudgetPeriod
 from ..core.calculators import BalanceCalculator, StatisticsCalculator
 from ..analytics import ChartGenerator, ReportGenerator
+from ..data.import_export import DataExporter, DataImporter
 
 console = Console()
 
@@ -548,6 +549,144 @@ def generate_chart(chart_type, start_date, end_date, output_dir):
         
     except Exception as e:
         console.print(f"❌ Ошибка при создании графика: {e}")
+
+
+@main.command()
+@click.option('--format', 'export_format', type=click.Choice(['csv', 'excel', 'pdf', 'all']), 
+              default='all', help='Формат экспорта')
+@click.option('--output-dir', type=str, default='exports', help='Директория для сохранения файлов')
+def export_data(export_format, output_dir):
+    """Экспортировать данные в различных форматах"""
+    services = get_services()
+    transaction_service = services['transaction_service']
+    category_service = services['category_service']
+    budget_service = services['budget_service']
+    
+    try:
+        console.print(f"📤 Экспорт данных в формате: {export_format}")
+        
+        # Получаем данные
+        transactions = transaction_service.get_transactions()
+        categories = category_service.get_categories()
+        budgets = budget_service.get_budgets()
+        
+        if not transactions:
+            console.print("❌ Нет транзакций для экспорта")
+            return
+        
+        # Создаем экспортер
+        exporter = DataExporter(output_dir)
+        
+        # Экспортируем в зависимости от формата
+        if export_format == 'csv':
+            file_path = exporter.export_to_csv(transactions, categories)
+            console.print(f"✅ CSV файл создан: {os.path.basename(file_path)}")
+        elif export_format == 'excel':
+            file_path = exporter.export_to_excel(transactions, categories, budgets)
+            console.print(f"✅ Excel файл создан: {os.path.basename(file_path)}")
+        elif export_format == 'pdf':
+            file_path = exporter.export_to_pdf(transactions, categories, budgets)
+            console.print(f"✅ PDF файл создан: {os.path.basename(file_path)}")
+        elif export_format == 'all':
+            files = exporter.export_all_formats(transactions, categories, budgets)
+            console.print("✅ Все форматы экспортированы!")
+            
+            # Показываем созданные файлы
+            table = Table(title="📋 Созданные файлы", box=box.ROUNDED)
+            table.add_column("Формат", style="cyan")
+            table.add_column("Файл", style="green")
+            
+            for format_type, file_path in files.items():
+                filename = os.path.basename(file_path)
+                table.add_row(format_type.upper(), filename)
+            
+            console.print(table)
+        
+        console.print(f"📁 Директория: {output_dir}")
+        
+    except Exception as e:
+        console.print(f"❌ Ошибка при экспорте данных: {e}")
+
+
+@main.command()
+@click.option('--file', 'file_path', type=str, required=True, help='Путь к файлу для импорта')
+@click.option('--format', 'import_format', type=click.Choice(['csv', 'excel', 'bank']), 
+              default='csv', help='Формат импорта')
+@click.option('--date-format', type=str, default='%d.%m.%Y', help='Формат даты в файле')
+@click.option('--skip-duplicates', is_flag=True, default=True, help='Пропускать дубликаты')
+@click.option('--validate-only', is_flag=True, help='Только валидация файла без импорта')
+def import_data(file_path, import_format, date_format, skip_duplicates, validate_only):
+    """Импортировать данные из файла"""
+    services = get_services()
+    transaction_service = services['transaction_service']
+    category_service = services['category_service']
+    
+    try:
+        console.print(f"📥 Импорт данных из файла: {os.path.basename(file_path)}")
+        console.print(f"📋 Формат: {import_format}")
+        
+        # Создаем импортер
+        importer = DataImporter()
+        
+        if validate_only:
+            # Только валидация
+            validation_result = importer.validate_import_file(file_path, import_format)
+            
+            if validation_result['valid']:
+                console.print("✅ Файл валиден!")
+                console.print(f"📊 Количество строк: {validation_result['row_count']}")
+                console.print(f"📋 Колонки: {', '.join(validation_result['columns'])}")
+                
+                # Показываем пример данных
+                if 'sample_data' in validation_result:
+                    table = Table(title="📋 Пример данных", box=box.ROUNDED)
+                    if validation_result['sample_data']:
+                        # Добавляем колонки
+                        for key in validation_result['sample_data'][0].keys():
+                            table.add_column(key, style="cyan")
+                        
+                        # Добавляем строки
+                        for row in validation_result['sample_data']:
+                            table.add_row(*[str(value) for value in row.values()])
+                        
+                        console.print(table)
+            else:
+                console.print(f"❌ Файл невалиден: {validation_result['error']}")
+                if 'available_columns' in validation_result:
+                    console.print(f"📋 Доступные колонки: {', '.join(validation_result['available_columns'])}")
+        else:
+            # Импорт данных
+            if import_format == 'csv':
+                results = importer.import_from_csv(
+                    file_path, transaction_service, category_service, 
+                    date_format, skip_duplicates
+                )
+            elif import_format == 'excel':
+                results = importer.import_from_excel(
+                    file_path, transaction_service, category_service, 
+                    skip_duplicates=skip_duplicates
+                )
+            elif import_format == 'bank':
+                results = importer.import_bank_statement(
+                    file_path, transaction_service, category_service,
+                    skip_duplicates=skip_duplicates
+                )
+            
+            # Показываем результаты
+            console.print("✅ Импорт завершен!")
+            console.print(f"📥 Импортировано: {results['imported']} транзакций")
+            console.print(f"⏭️  Пропущено: {results['skipped']} дубликатов")
+            console.print(f"❌ Ошибок: {results['errors']}")
+            
+            if results['error_details']:
+                console.print("\n🔍 Детали ошибок:")
+                for error in results['error_details'][:5]:  # Показываем первые 5 ошибок
+                    console.print(f"  • {error}")
+                if len(results['error_details']) > 5:
+                    console.print(f"  ... и еще {len(results['error_details']) - 5} ошибок")
+        
+    except Exception as e:
+        console.print(f"❌ Ошибка при импорте данных: {e}")
 
 
 @main.command()
