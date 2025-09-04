@@ -1,0 +1,34 @@
+# Dockerfile для Jupyter Notebook
+FROM jupyter/scipy-notebook:latest
+
+# Устанавливаем рабочую директорию
+WORKDIR /home/jovyan/work
+
+# Устанавливаем Poetry
+USER root
+RUN pip install poetry
+
+# Копируем файлы конфигурации Poetry
+COPY pyproject.toml poetry.lock ./
+
+# Настраиваем Poetry
+RUN poetry config virtualenvs.create false
+
+# Устанавливаем зависимости
+RUN poetry install
+
+# Копируем исходный код
+COPY src/ ./src/
+COPY data/ ./data/
+
+# Возвращаемся к пользователю jovyan
+USER jovyan
+
+# Устанавливаем переменные окружения
+ENV PYTHONPATH=/home/jovyan/work/src
+
+# Открываем порт Jupyter
+EXPOSE 8888
+
+# Команда по умолчанию
+CMD ["start-notebook.sh", "--NotebookApp.token=''", "--NotebookApp.password=''"]

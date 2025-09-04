@@ -1,0 +1,37 @@
+# Dockerfile для backup сервиса
+FROM python:3.11-slim
+
+# Устанавливаем рабочую директорию
+WORKDIR /app
+
+# Устанавливаем системные зависимости
+RUN apt-get update && apt-get install -y \
+    postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
+# Устанавливаем Poetry
+RUN pip install poetry
+
+# Копируем файлы конфигурации Poetry
+COPY pyproject.toml poetry.lock ./
+
+# Настраиваем Poetry
+RUN poetry config virtualenvs.create false
+
+# Устанавливаем зависимости
+RUN poetry install --only=main
+
+# Копируем скрипты backup
+COPY docker/backup/ ./backup/
+
+# Создаем пользователя
+RUN useradd --create-home --shell /bin/bash app \
+    && chown -R app:app /app
+USER app
+
+# Устанавливаем переменные окружения
+ENV PYTHONPATH=/app/src
+ENV PYTHONUNBUFFERED=1
+
+# Команда по умолчанию
+CMD ["python", "backup/backup.py"]

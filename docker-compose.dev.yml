@@ -1,0 +1,98 @@
+services:
+  # Основное приложение для разработки
+  ai-finance-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: ai-finance-dev
+    ports:
+      - "8000:8000"
+      - "5678:5678"  # Для debugpy
+    volumes:
+      - .:/app
+      - /app/.venv  # Исключаем виртуальное окружение
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/ai_finance_dev
+      - REDIS_URL=redis://redis:6379/0
+      - DEBUG=true
+      - PYTHONPATH=/app/src
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - ai-finance-dev-network
+    restart: unless-stopped
+    command: poetry run python -m debugpy --listen 0.0.0.0:5678 --wait-for-client main.py
+
+  # База данных PostgreSQL для разработки
+  postgres:
+    image: postgres:15-alpine
+    container_name: ai-finance-postgres-dev
+    environment:
+      POSTGRES_DB: ai_finance_dev
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5433:5432"  # Другой порт для dev
+    networks:
+      - ai-finance-dev-network
+    restart: unless-stopped
+
+  # Redis для разработки
+  redis:
+    image: redis:7-alpine
+    container_name: ai-finance-redis-dev
+    ports:
+      - "6380:6379"  # Другой порт для dev
+    volumes:
+      - redis_dev_data:/data
+    networks:
+      - ai-finance-dev-network
+    restart: unless-stopped
+
+  # Jupyter для анализа данных
+  jupyter:
+    build:
+      context: .
+      dockerfile: Dockerfile.jupyter
+    container_name: ai-finance-jupyter
+    ports:
+      - "8888:8888"
+    volumes:
+      - .:/app
+      - jupyter_data:/home/jovyan/work
+    environment:
+      - JUPYTER_ENABLE_LAB=yes
+    networks:
+      - ai-finance-dev-network
+    restart: unless-stopped
+
+  # pgAdmin для управления базой данных
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: ai-finance-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@ai-finance.local
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+    networks:
+      - ai-finance-dev-network
+    restart: unless-stopped
+
+volumes:
+  postgres_dev_data:
+  redis_dev_data:
+  jupyter_data:
+  pgadmin_data:
+
+networks:
+  ai-finance-dev-network:
+    driver: bridge

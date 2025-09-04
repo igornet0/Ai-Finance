@@ -1,0 +1,47 @@
+# Пример пользовательской конфигурации
+# Скопируйте этот файл в user_config.yaml и настройте под себя
+
+# Настройки пользователя
+user:
+  name: "Иван Иванов"
+  email: "ivan@example.com"
+  currency: "RUB"
+  timezone: "Europe/Moscow"
+  language: "ru"
+
+# Настройки интерфейса
+ui:
+  theme: "light"  # light, dark
+  date_format: "%d.%m.%Y"
+  number_format: "ru_RU"
+  show_currency_symbol: true
+  currency_position: "after"  # before, after
+
+# Настройки уведомлений
+notifications:
+  enabled: true
+  budget_alerts: true
+  budget_threshold: 0.8
+  low_balance_alerts: true
+  low_balance_threshold: 1000
+
+# Настройки резервного копирования
+backup:
+  enabled: true
+  auto_backup: true
+  backup_interval: "daily"  # daily, weekly, monthly
+  max_backups: 30
+
+# Настройки отчетов
+reports:
+  default_period: "month"
+  chart_style: "seaborn"
+  show_percentages: true
+  group_by_category: true
+
+# Настройки экспорта
+export:
+  default_format: "csv"
+  csv_encoding: "utf-8"
+  include_headers: true
+  date_format: "%d.%m.%Y"
